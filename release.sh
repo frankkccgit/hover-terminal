@@ -5,7 +5,7 @@
 # 發版前必須先在 CHANGELOG.md 最上面寫好「## <版本號> (日期)」這一段，否則拒絕發版。
 # 這段內容會同時成為 commit 訊息和 GitHub Release 的說明。
 # 做的事：檢查 → 改 manifest.json／versions.json 的版本號 → commit → tag → push → 發 GitHub Release
-# 各 vault 的 BRAT 會在 Obsidian 下次啟動時自動更新。
+#        → 用 update-vaults.sh 把每個開著的 vault 立刻更新並核對版本（BRAT 只在 Obsidian 啟動時才會自己更新）
 set -e
 cd "$(dirname "$0")"
 v=$1
@@ -38,3 +38,7 @@ git tag "$v"
 git push -q
 git push -q origin "$v"
 gh release create "$v" main.js manifest.json styles.css --title "$v" --notes "$notes"
+
+# Release 已經發出去了，所以這一步失敗不回滾，只提醒：之後可以再單獨執行 ./update-vaults.sh
+echo "更新各 vault："
+./update-vaults.sh "$v" || echo "⚠ 有 vault 沒更新成功，稍後再執行 ./update-vaults.sh $v"

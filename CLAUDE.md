@@ -13,8 +13,7 @@ Frank 的使用筆記（只記用法，不記開發細節）：Skills vault `280
 3. **每完成一個小改動就提交一次**，commit 訊息寫清楚「改了什麼、為什麼」，失敗的做法也要提交並說明為什麼放棄
 4. 在 `CHANGELOG.md` 最上面加 `## <新版本號> (日期)`，寫給使用者看的變更說明
 5. 發版：`./release.sh <新版本號>`。腳本會檢查 CHANGELOG 和未提交的改動，不通過就拒絕發版
-6. 其他 vault：BRAT 會在 Obsidian 下次啟動時自動更新；要立刻更新可以用
-   `obsidian vault="<vault>" eval code="app.plugins.plugins['obsidian42-brat'].betaPlugins.updatePlugin('frankkccgit/hover-terminal',false,false,false)"`
+6. 其他 vault：`release.sh` 發版後會自動執行 `./update-vaults.sh`，把每個開著的 vault 立刻更新，並核對實際載入的版本（BRAT 只在 Obsidian 啟動時才自己更新，常開的 vault 會停在舊版）。發現某個 vault 是舊版時，也可以單獨執行 `./update-vaults.sh`
 
 ## 測試安全規則（踩過的坑）
 - **不要在 Frank 開著 Claude session 的終端機旁邊做會開檔案、關分頁、重載終端機外掛的測試**。開檔案可能蓋掉終端機分頁，該 session 就會結束（2026-11-10 真的發生過）。測試前先確認所有終端機都已釘選，只對自己開的測試視窗動手，測完只關自己開的那個。
