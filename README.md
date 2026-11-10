@@ -15,6 +15,7 @@ Minimize the popover while the agent works. The title bar keeps showing its live
 | **Custom background** | Terminals opened that way use their own background colour (colour picker in settings). The Terminal plugin draws its background on a WebGL canvas from the theme, so CSS can't recolour it. Instead, these terminals use a copy of your default profile with "follow theme" turned off. The colour applies to newly opened terminals, because recolouring an open one would restart its shell. |
 | **Status bar summary** | `Claude ⏳ 1  ❓ 1  ✅ 2`: how many sessions are running, waiting for your reply or idle. Click it to jump to a session. |
 | **Expand-on-demand API** | `app.plugins.plugins["hover-terminal"].wake(token, event)` expands the minimized popover whose terminal title contains `token`, and keeps keyboard focus where it was. The Claude Code hook below uses it. |
+| **Terminal protection** | When a terminal tab is focused, Obsidian opens a note (a link, a command or `obsidian open`) in the most recent unpinned tab, which replaces the terminal and ends its session. The plugin pins every terminal tab once when it opens, so notes go to a new tab instead. All terminals need this, because if only the focused one is pinned, Obsidian replaces a different terminal. You can turn it off in settings. |
 | **Health check** | Hover Editor isn't actively maintained, so if its DOM changes this plugin shows a notice instead of failing silently. Run **Hover Terminal: Diagnose** for details. |
 
 ## Requirements

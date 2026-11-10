@@ -37,6 +37,11 @@ const DEFAULTS = {
   tintColor: "#1e1a33",
   statusBar: true,
   ribbonIcon: "picture-in-picture-2",
+  // Pin each terminal tab once when it first appears. When the active tab is a terminal, Obsidian opens files
+  // (e.g. `obsidian open`, clicking a link) in the most recent unpinned tab, which replaces the terminal and
+  // kills its shell. Every terminal has to be pinned, not just the active one: with only the active one pinned,
+  // Obsidian picks another unpinned terminal instead.
+  protectTerminals: true,
 };
 // Ribbon icon choices (Lucide icon ids bundled with Obsidian)
 const RIBBON_ICONS = {
@@ -60,6 +65,7 @@ module.exports = class HoverTerminal extends Plugin {
     this.settings = Object.assign({}, DEFAULTS, await this.loadData());
     this.waiting = new WeakSet(); // leaves that sent a "needs reply" notification
     this.checkedPopovers = new WeakSet();
+    this.pinnedOnce = new WeakSet(); // terminals already auto-pinned (so a manual unpin sticks)
     this.warned = false;
 
     this.addSettingTab(new HoverTerminalSettingTab(this.app, this));
@@ -142,6 +148,10 @@ module.exports = class HoverTerminal extends Plugin {
         active: true,
         state: { [TERMINAL_VIEW]: { cwd: this.app.vault.adapter.basePath, focus: true, profile, serial: null } },
       });
+      if (this.settings.protectTerminals) {
+        leaf.setPinned(true);
+        this.pinnedOnce.add(leaf);
+      }
       this.tick();
     } catch (e) {
       console.error("[hover-terminal]", e);
@@ -187,6 +197,11 @@ module.exports = class HoverTerminal extends Plugin {
     for (const leaf of this.terminals()) {
       const state = this.stateOf(leaf);
       if (state) counts[state]++;
+
+      if (this.settings.protectTerminals && !this.pinnedOnce.has(leaf)) {
+        this.pinnedOnce.add(leaf);
+        if (!leaf.pinned) leaf.setPinned(true);
+      }
 
       // Give the padding around the terminal the same background as the terminal itself
       const bg = this.backgroundOf(leaf);
@@ -371,6 +386,11 @@ class HoverTerminalSettingTab extends PluginSettingTab {
         for (const [id, label] of Object.entries(RIBBON_ICONS)) d.addOption(id, label);
         d.setValue(s.ribbonIcon).onChange(async (v) => { s.ribbonIcon = v; await this.plugin.saveSettings(); });
       });
+
+    new Setting(containerEl)
+      .setName("Protect terminals from being replaced")
+      .setDesc("Pin every terminal tab once when it opens, so opening a note while a terminal is focused (a link, a command or `obsidian open`) uses another tab instead of replacing the terminal and ending its session. If you unpin a terminal yourself, it stays unpinned.")
+      .addToggle((t) => t.setValue(s.protectTerminals).onChange(async (v) => { s.protectTerminals = v; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
       .setName("Status bar summary")
