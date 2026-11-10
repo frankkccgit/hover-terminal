@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4 (2026-11-10)
+- **Fixed: no spinning ball and wrong status bar with Terminal 3.29+.** Terminal 3.29 supports a new status protocol (OSC 7501). When it is available, Claude Code stops putting ◐/✳ in the window title, and Terminal shows the status only on the tab header, which Hover Editor popovers don't have. Hover Terminal now reads that status and draws the spinning ◐◓◑◒ in the popover title itself. The status bar counts running / waiting / idle sessions correctly again. Older Terminal versions work as before.
+- Fixed: with Terminal's tab prefix turned off, a title containing ":" lost everything before the colon.
+- Fixed: the session menu no longer drops the first word of titles that have no status glyph.
+- "Diagnose" now lists how each terminal's state is detected.
+
 ## 0.1.3 (2026-11-10)
 - **New: terminal protection.** Every terminal tab is pinned once when it opens. Without this, opening a note while a terminal is focused (a link, a command or `obsidian open`) replaced the terminal and ended its session.
 - Every terminal has to be pinned, not just the focused one: with only the focused one pinned, Obsidian replaced a different, unpinned terminal instead. This really happened during testing.
