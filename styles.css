@@ -1,22 +1,8 @@
 /*
- * Tint for terminals inside Hover Editor popovers.
- * The Terminal plugin takes its background from the global theme and xterm.js draws it on a WebGL canvas,
- * so one terminal's background can't be changed on its own. Instead, a colour layer with
- * mix-blend-mode: lighten goes on top: each channel keeps the lighter value, so the dark background
- * takes on the tint while white and bright text stay as they are.
- * The colour comes from the plugin settings (--hover-terminal-tint on body).
+ * Terminals opened by "Open terminal in popover" use a profile with their own background colour.
+ * xterm.js draws that colour on its WebGL canvas. This rule gives the padding around the canvas the same colour,
+ * so there's no theme-coloured ring. The plugin sets --hover-terminal-bg per leaf from the saved profile.
  */
-body.theme-dark.hover-terminal-tint .hover-popover[data-active-view-type="terminal:terminal"] .workspace-leaf-content[data-type="terminal:terminal"] .view-content {
-  position: relative;
-  background-color: var(--hover-terminal-tint);
-}
-
-body.theme-dark.hover-terminal-tint .hover-popover[data-active-view-type="terminal:terminal"] .workspace-leaf-content[data-type="terminal:terminal"] .view-content::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--hover-terminal-tint);
-  mix-blend-mode: lighten;
-  pointer-events: none;
-  z-index: 10;
+.workspace-leaf.hover-terminal-bg .workspace-leaf-content[data-type="terminal:terminal"] .view-content {
+  background-color: var(--hover-terminal-bg);
 }

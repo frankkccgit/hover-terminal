@@ -11,7 +11,8 @@ Minimize the popover while the agent works. The title bar keeps showing its live
 | Feature | What it does |
 |---|---|
 | **Live popover titles** | Hover Editor only refreshes a popover's title when you click it. This plugin copies the terminal's live title (set by the shell via OSC 0) into the popover title bar, so a minimized popover shows e.g. `Terminal: ◑ Refactor parser` while Claude Code works and `Terminal: ✳ Refactor parser` when idle. |
-| **Background tint** | Gives terminals in popovers their own background colour, set with a colour picker (dark theme only). |
+| **One-click popover terminal** | The **Open terminal in popover** command (also a ribbon button) opens a terminal straight into a Hover Editor popover, so there's no separate "convert" step. |
+| **Custom background** | Terminals opened that way use their own background colour (colour picker in settings). The Terminal plugin draws its background on a WebGL canvas from the theme, so CSS can't recolour it. Instead, these terminals use a copy of your default profile with "follow theme" turned off. The colour applies to newly opened terminals, because recolouring an open one would restart its shell. |
 | **Status bar summary** | `Claude ⏳ 1  ❓ 1  ✅ 2`: how many sessions are running, waiting for your reply or idle. Click it to jump to a session. |
 | **Expand-on-demand API** | `app.plugins.plugins["hover-terminal"].wake(token, event)` expands the minimized popover whose terminal title contains `token`, and keeps keyboard focus where it was. The Claude Code hook below uses it. |
 | **Health check** | Hover Editor isn't actively maintained, so if its DOM changes this plugin shows a notice instead of failing silently. Run **Hover Terminal: Diagnose** for details. |
@@ -19,7 +20,7 @@ Minimize the popover while the agent works. The title bar keeps showing its live
 ## Requirements
 
 - Obsidian desktop with the **Terminal** and **Hover Editor** community plugins enabled
-- To get a terminal into a popover: focus the terminal tab, then run **Hover Editor: Convert active pane to popover**
+- To get a terminal into a popover, run **Hover Terminal: Open terminal in popover** (or click its ribbon button). You can also convert an existing terminal tab with **Hover Editor: Convert active pane to popover**, but that terminal keeps the theme background.
 
 ## Install
 
@@ -59,7 +60,7 @@ How it identifies the session: the hook writes a unique window title to its own 
 ## If Hover Editor or Obsidian updates and something breaks
 
 1. Run **Hover Terminal: Diagnose**. It lists which expected element is missing.
-2. Everything that depends on Hover Editor's DOM is in the `HE` object at the top of `main.js`. Updating those selectors is usually the whole fix.
+2. Everything that depends on Hover Editor's DOM is in the `HE` object at the top of `main.js`. Updating those selectors is usually the whole fix. "Open terminal in popover" also uses Hover Editor's `spawnPopover()` and the Terminal plugin's profile settings, and Diagnose checks both.
 3. Until it's fixed, you can pin Hover Editor to its previous version with BRAT's "frozen version" option.
 
 ## License

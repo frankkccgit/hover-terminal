@@ -8,5 +8,5 @@ v=$1; [ -n "$v" ] || { echo "usage: $0 <version>"; exit 1; }
 min=$(jq -r .minAppVersion manifest.json)
 jq --arg v "$v" '.version=$v' manifest.json > m.tmp && mv m.tmp manifest.json
 jq --arg v "$v" --arg m "$min" '.[$v]=$m' versions.json > v.tmp && mv v.tmp versions.json
-git add -A && git commit -m "Release $v" && git tag "$v" && git push && git push origin "$v"
+git add -A && git commit -m "Release $v" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" && git tag "$v" && git push && git push origin "$v"
 gh release create "$v" main.js manifest.json styles.css --title "$v" --generate-notes

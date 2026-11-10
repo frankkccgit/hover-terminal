@@ -8,7 +8,9 @@
  *
  * Features
  *   1. Title sync: copies each terminal's live title into its popover title bar, so a minimized popover still shows it.
- *   2. Tint: gives terminals inside popovers their own background colour (dark theme).
+ *   2. Background: the "Open terminal in popover" command (also a ribbon button) opens a Terminal session straight into
+ *      a Hover Editor popover, using a profile with its own background colour. The Terminal plugin draws its background
+ *      on a WebGL canvas from the theme, so CSS can't recolour an existing terminal; a profile with followTheme off can.
  *   3. Status bar: counts Claude Code sessions that are running, idle or waiting for a reply. Click it to jump to one.
  *   4. API for scripts (e.g. a Claude Code hook): wake(token, event) expands the minimized popover whose
  *      terminal title contains `token`. Keyboard focus stays where it was.
@@ -31,10 +33,11 @@ const HE = {
 
 const DEFAULTS = {
   syncTitle: true,
-  tintEnabled: true,
-  tintColor: "#3a2f55",
+  tintEnabled: true, // use tintColor as the background of terminals opened by this plugin
+  tintColor: "#1e1a33",
   statusBar: true,
 };
+const PROFILE_NAME = "Hover Terminal"; // marks terminals opened by this plugin
 
 const IDLE = "✳";
 // Claude Code's title spinner glyphs (observed: ◐◓◑◒) plus braille spinners used by other CLIs.
@@ -48,7 +51,13 @@ module.exports = class HoverTerminal extends Plugin {
     this.warned = false;
 
     this.addSettingTab(new HoverTerminalSettingTab(this.app, this));
-    this.applyTint();
+
+    this.addCommand({
+      id: "open-terminal-in-popover",
+      name: "Open terminal in popover",
+      callback: () => this.openTerminalPopover(),
+    });
+    this.addRibbonIcon("square-terminal", "Open terminal in popover (Hover Terminal)", () => this.openTerminalPopover());
 
     this.statusEl = this.addStatusBarItem();
     this.statusEl.addClass("hover-terminal-status", "mod-clickable");
@@ -71,19 +80,71 @@ module.exports = class HoverTerminal extends Plugin {
   }
 
   onunload() {
-    document.body.style.removeProperty("--hover-terminal-tint");
-    document.body.removeClass("hover-terminal-tint");
+    for (const leaf of this.terminals()) {
+      leaf.containerEl.removeClass("hover-terminal-bg");
+      leaf.containerEl.style.removeProperty("--hover-terminal-bg");
+    }
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
-    this.applyTint();
     this.tick();
   }
 
-  applyTint() {
-    document.body.toggleClass("hover-terminal-tint", this.settings.tintEnabled);
-    document.body.style.setProperty("--hover-terminal-tint", this.settings.tintColor);
+  /** A copy of the Terminal plugin's default integrated profile for this OS, with our own background. */
+  buildProfile() {
+    const term = this.app.plugins.plugins["terminal"];
+    const profiles = term?.settings?.value?.profiles;
+    if (!profiles) throw new Error("Terminal plugin settings not found");
+    const platform = process.platform;
+    const base =
+      profiles[`${platform}IntegratedDefault`] ||
+      Object.values(profiles).find((p) => p.type === "integrated" && p.platforms?.[platform]);
+    if (!base) throw new Error(`No integrated Terminal profile for ${platform}`);
+    const profile = JSON.parse(JSON.stringify(base));
+    profile.name = PROFILE_NAME;
+    if (this.settings.tintEnabled) {
+      const cs = getComputedStyle(document.body);
+      profile.followTheme = false;
+      profile.terminalOptions = Object.assign({}, profile.terminalOptions, {
+        theme: {
+          background: this.settings.tintColor,
+          foreground: cs.getPropertyValue("--text-normal").trim(),
+          cursor: cs.getPropertyValue("--interactive-accent").trim(),
+          selectionBackground: cs.getPropertyValue("--text-selection").trim() || undefined,
+        },
+      });
+    }
+    return profile;
+  }
+
+  async openTerminalPopover() {
+    try {
+      const he = this.app.plugins.plugins[HE.pluginId];
+      if (!he?.spawnPopover) throw new Error("Hover Editor isn't enabled (or spawnPopover is gone)");
+      const profile = this.buildProfile();
+      const leaf = he.spawnPopover();
+      await leaf.setViewState({
+        type: TERMINAL_VIEW,
+        active: true,
+        state: { [TERMINAL_VIEW]: { cwd: this.app.vault.adapter.basePath, focus: true, profile, serial: null } },
+      });
+      this.tick();
+    } catch (e) {
+      console.error("[hover-terminal]", e);
+      new Notice(`Hover Terminal: couldn't open a terminal popover.\n${e.message}\nRun "Hover Terminal: Diagnose" for details.`, 10000);
+    }
+  }
+
+  /** Background of a terminal opened by this plugin (from its saved profile), or null. */
+  backgroundOf(leaf) {
+    try {
+      const profile = leaf.view.getState()?.[TERMINAL_VIEW]?.profile;
+      if (profile?.name !== PROFILE_NAME || profile.followTheme) return null;
+      return profile.terminalOptions?.theme?.background || null;
+    } catch (e) {
+      return null;
+    }
   }
 
   // ---------- helpers ----------
@@ -113,6 +174,12 @@ module.exports = class HoverTerminal extends Plugin {
     for (const leaf of this.terminals()) {
       const state = this.stateOf(leaf);
       if (state) counts[state]++;
+
+      // Give the padding around the terminal the same background as the terminal itself
+      const bg = this.backgroundOf(leaf);
+      leaf.containerEl.toggleClass("hover-terminal-bg", !!bg);
+      if (bg && leaf.containerEl.style.getPropertyValue("--hover-terminal-bg") !== bg)
+        leaf.containerEl.style.setProperty("--hover-terminal-bg", bg);
 
       const pop = this.popoverOf(leaf);
       if (!pop) continue;
@@ -211,12 +278,24 @@ module.exports = class HoverTerminal extends Plugin {
     if (!he) {
       ok = false;
       lines.push("✗ Hover Editor isn't installed or enabled");
-    } else lines.push(`✓ Hover Editor ${he.manifest.version}`);
+    } else {
+      lines.push(`✓ Hover Editor ${he.manifest.version}`);
+      if (typeof he.spawnPopover !== "function") {
+        ok = false;
+        lines.push("✗ Hover Editor no longer has spawnPopover(), so \"Open terminal in popover\" won't work");
+      }
+    }
     const term = this.app.plugins.plugins["terminal"];
     if (!term) {
       ok = false;
       lines.push("✗ Terminal plugin isn't installed or enabled");
-    } else lines.push(`✓ Terminal ${term.manifest.version}`);
+    } else {
+      lines.push(`✓ Terminal ${term.manifest.version}`);
+      if (!term.settings?.value?.profiles) {
+        ok = false;
+        lines.push("✗ Can't read the Terminal plugin's profiles, so \"Open terminal in popover\" won't work");
+      }
+    }
 
     const leaves = this.terminals();
     lines.push(`Terminals: ${leaves.length} (in popovers: ${leaves.filter((l) => this.popoverOf(l)).length})`);
@@ -262,13 +341,13 @@ class HoverTerminalSettingTab extends PluginSettingTab {
       .addToggle((t) => t.setValue(s.syncTitle).onChange(async (v) => { s.syncTitle = v; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
-      .setName("Tint popover terminals")
-      .setDesc("Dark theme only. Text colours stay as they are.")
+      .setName("Custom background")
+      .setDesc('For terminals opened with "Open terminal in popover" (command or ribbon button). Off: follow the Obsidian theme.')
       .addToggle((t) => t.setValue(s.tintEnabled).onChange(async (v) => { s.tintEnabled = v; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
-      .setName("Tint colour")
-      .setDesc("Brighter colours give a stronger tint, but can wash out dark text. Try deep purple #3a2f55, deep blue #22325a, deep green #1f3d33 or deep red #4a2430.")
+      .setName("Background colour")
+      .setDesc("Applies to terminals opened from now on. A terminal that's already open keeps its colour, because changing it would restart its shell. Some ideas: #1e1a33 deep purple, #14213d deep blue, #13261f deep green, #2a1218 deep red.")
       .addColorPicker((c) => c.setValue(s.tintColor).onChange(async (v) => { s.tintColor = v; await this.plugin.saveSettings(); }))
       .addExtraButton((b) => b.setIcon("rotate-ccw").setTooltip("Reset to default").onClick(async () => { s.tintColor = DEFAULTS.tintColor; await this.plugin.saveSettings(); this.display(); }));
 
