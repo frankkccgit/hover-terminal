@@ -1,7 +1,7 @@
 {
   "id": "hover-terminal",
   "name": "Hover Terminal",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "minAppVersion": "1.5.0",
   "description": "Live titles, background tint, a status bar summary and an expand-on-demand API for Terminal plugin sessions inside Hover Editor popovers.",
   "author": "Frank Chen",
