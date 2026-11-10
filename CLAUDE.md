@@ -18,6 +18,7 @@ Frank 的使用筆記（只記用法，不記開發細節）：Skills vault `280
 ## 測試安全規則（踩過的坑）
 - **不要在 Frank 開著 Claude session 的終端機旁邊做會開檔案、關分頁、重載終端機外掛的測試**。開檔案可能蓋掉終端機分頁，該 session 就會結束（2026-11-10 真的發生過）。測試前先確認所有終端機都已釘選，只對自己開的測試視窗動手，測完只關自己開的那個。
 - 重載 `terminal` 外掛會關掉所有終端機，絕對不要做。重載 `hover-terminal` 本身沒問題。
+- **`obsidian eval` 不要在物件之間遞迴搜尋**（例如從 view 一路往下找 xterm）。這會翻進整個 app 的物件，卡死該 vault 的視窗（2026-11-10 Frank_AI_Vault 因此整個黑掉，終端機 session 斷掉）。只讀已知的路徑，例如 `leaf.getDisplayText()`；對別人正在用的 vault 下指令時，用 `perl -e 'alarm 4; exec @ARGV' obsidian ...` 加逾時。
 
 ## 依賴其他外掛的地方（壞掉時先看這裡）
 - Hover Editor 的 DOM 選擇器全在 `main.js` 開頭的 `HE` 物件；另外用到 `spawnPopover()`
