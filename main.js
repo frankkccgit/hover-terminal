@@ -4,6 +4,8 @@
  * Works with two other community plugins:
  *   - Terminal (polyipseity/obsidian-terminal): view type "terminal:terminal". Its tab title follows the
  *     window title the shell sets (OSC 0). Claude Code, for example, shows a spinner while working and ✳ when idle.
+ *     Terminal 3.29+ answers Claude Code's OSC 7501 probe; Claude Code then drops the glyph from the title and reports
+ *     its state over OSC 7501, which Terminal puts on the tab header as data-terminal-status (see STATUS_MAP).
  *   - Hover Editor (nothingislost/obsidian-hover-editor): floating popovers that can be minimized.
  *
  * Features
@@ -59,6 +61,15 @@ const PROFILE_NAME = "Hover Terminal"; // marks terminals opened by this plugin
 const IDLE = "✳";
 // Claude Code's title spinner glyphs (observed: ◐◓◑◒) plus braille spinners used by other CLIs.
 const RUNNING_RE = /^[◐◓◑◒·✢✶✻✽⠀-⣿]/;
+// Any status glyph at the start of a title (running or idle), with the space after it.
+const GLYPH_PREFIX_RE = /^[◐◓◑◒·✢✶✻✽⠀-⣿✳]\s*/;
+const SPINNER = ["◐", "◓", "◑", "◒"];
+// Terminal 3.29+ supports the OSC 7501 "program status" protocol. When it does, Claude Code drops the glyph from the
+// window title and reports its state there instead; Terminal shows it on the tab header as `data-terminal-status`.
+// Hover Editor popovers have no visible tab header, so we read the attribute and draw our own glyph in the popover title.
+const STATUS_ATTR = "data-terminal-status";
+// "seen" = "done" after the user has looked at the tab.
+const STATUS_MAP = { working: "running", blocked: "waiting", idle: "idle", done: "idle", seen: "idle", error: "idle" };
 
 module.exports = class HoverTerminal extends Plugin {
   async onload() {
@@ -179,9 +190,25 @@ module.exports = class HoverTerminal extends Plugin {
   }
   /** Title without the "Terminal: " prefix. */
   rawTitle(leaf) {
-    return leaf.getDisplayText().replace(/^[^:]*:\s*/, "");
+    const t = leaf.getDisplayText();
+    // Terminal 3.29+ can hide the prefix; then a ":" belongs to the title itself
+    if (this.app.plugins.plugins["terminal"]?.settings?.value?.showTerminalTabPrefix === false) return t;
+    return t.replace(/^[^:]*:\s*/, "");
+  }
+  /** Title without the "Terminal: " prefix and without a leading status glyph. */
+  bareTitle(leaf) {
+    return this.rawTitle(leaf).replace(GLYPH_PREFIX_RE, "");
   }
   stateOf(leaf) {
+    // Terminal 3.29+: program status reported over OSC 7501
+    const status = leaf.tabHeaderEl?.getAttribute(STATUS_ATTR);
+    if (status && STATUS_MAP[status]) {
+      const state = STATUS_MAP[status];
+      if (state === "running") this.waiting.delete(leaf);
+      if (state === "idle" && this.waiting.has(leaf)) return "waiting";
+      return state;
+    }
+    // Older Terminal: Claude Code puts a spinner / ✳ at the start of the window title
     const t = this.rawTitle(leaf);
     if (RUNNING_RE.test(t)) {
       this.waiting.delete(leaf);
@@ -194,6 +221,7 @@ module.exports = class HoverTerminal extends Plugin {
   // ---------- periodic work ----------
   tick() {
     const counts = { running: 0, waiting: 0, idle: 0 };
+    this.frame = ((this.frame || 0) + 1) % SPINNER.length;
     for (const leaf of this.terminals()) {
       const state = this.stateOf(leaf);
       if (state) counts[state]++;
@@ -219,12 +247,21 @@ module.exports = class HoverTerminal extends Plugin {
         const activeType = pop.getAttribute(HE.activeTypeAttr);
         const titleEl = pop.querySelector(HE.title);
         if (titleEl && (!activeType || activeType === TERMINAL_VIEW)) {
-          const text = leaf.getDisplayText();
+          const text = this.popoverTitle(leaf, state);
           if (titleEl.textContent !== text) titleEl.textContent = text;
         }
       }
     }
     this.renderStatus(counts);
+  }
+
+  /** Popover title: the terminal title with a glyph for the session state (spinning while running). */
+  popoverTitle(leaf, state) {
+    // Without OSC 7501 the title already carries Claude Code's own glyph; keep it as is.
+    if (!leaf.tabHeaderEl?.getAttribute(STATUS_ATTR)) return leaf.getDisplayText();
+    const glyph = { running: SPINNER[this.frame], waiting: "❓", idle: IDLE }[state];
+    const title = this.bareTitle(leaf);
+    return glyph ? `${glyph} ${title}` : title;
   }
 
   renderStatus(c) {
@@ -249,7 +286,7 @@ module.exports = class HoverTerminal extends Plugin {
       const state = this.stateOf(leaf);
       if (!state) continue;
       menu.addItem((item) =>
-        item.setTitle(`${icon[state]} ${this.rawTitle(leaf).replace(/^\S+\s*/, "")}`).onClick(() => this.reveal(leaf, true))
+        item.setTitle(`${icon[state]} ${this.bareTitle(leaf)}`).onClick(() => this.reveal(leaf, true))
       );
     }
     menu.showAtMouseEvent(evt);
@@ -327,6 +364,11 @@ module.exports = class HoverTerminal extends Plugin {
 
     const leaves = this.terminals();
     lines.push(`Terminals: ${leaves.length} (in popovers: ${leaves.filter((l) => this.popoverOf(l)).length})`);
+    for (const l of leaves) {
+      const status = l.tabHeaderEl?.getAttribute(STATUS_ATTR);
+      const how = status ? `${STATUS_ATTR}="${status}" (OSC 7501)` : "title glyph";
+      lines.push(`  · ${this.bareTitle(l)}: ${this.stateOf(l) ?? "not Claude Code"} via ${how}`);
+    }
     const pops = Array.from(document.querySelectorAll(HE.popover)).filter((p) =>
       leaves.some((l) => p.contains(l.containerEl))
     );
