@@ -11,7 +11,7 @@ Minimize the popover while the agent works. The title bar keeps showing its live
 | Feature | What it does |
 |---|---|
 | **Live popover titles** | Hover Editor only refreshes a popover's title when you click it. This plugin copies the terminal's live title (set by the shell via OSC 0) into the popover title bar, so a minimized popover shows e.g. `Terminal: ◑ Refactor parser` while Claude Code works and `Terminal: ✳ Refactor parser` when idle. |
-| **One-click popover terminal** | The **Open terminal in popover** command (also a ribbon button) opens a terminal straight into a Hover Editor popover, so there's no separate "convert" step. |
+| **One-click popover terminal** | The **Open terminal in popover** command (also a ribbon button, with a choice of icon in settings) opens a terminal straight into a Hover Editor popover, so there's no separate "convert" step. |
 | **Custom background** | Terminals opened that way use their own background colour (colour picker in settings). The Terminal plugin draws its background on a WebGL canvas from the theme, so CSS can't recolour it. Instead, these terminals use a copy of your default profile with "follow theme" turned off. The colour applies to newly opened terminals, because recolouring an open one would restart its shell. |
 | **Status bar summary** | `Claude ⏳ 1  ❓ 1  ✅ 2`: how many sessions are running, waiting for your reply or idle. Click it to jump to a session. |
 | **Expand-on-demand API** | `app.plugins.plugins["hover-terminal"].wake(token, event)` expands the minimized popover whose terminal title contains `token`, and keeps keyboard focus where it was. The Claude Code hook below uses it. |

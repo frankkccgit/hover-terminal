@@ -19,7 +19,7 @@
  *
  * Everything that depends on Hover Editor's or Terminal's internals is in HE / TERMINAL_VIEW below, and only there.
  */
-const { Plugin, PluginSettingTab, Setting, Notice, Menu } = require("obsidian");
+const { Plugin, PluginSettingTab, Setting, Notice, Menu, setIcon } = require("obsidian");
 
 const TERMINAL_VIEW = "terminal:terminal";
 const HE = {
@@ -36,6 +36,18 @@ const DEFAULTS = {
   tintEnabled: true, // use tintColor as the background of terminals opened by this plugin
   tintColor: "#1e1a33",
   statusBar: true,
+  ribbonIcon: "picture-in-picture-2",
+};
+// Ribbon icon choices (Lucide icon ids bundled with Obsidian)
+const RIBBON_ICONS = {
+  "picture-in-picture-2": "Picture in picture (floating window)",
+  "app-window": "App window",
+  bot: "Bot",
+  "bot-message-square": "Bot in a message bubble",
+  sparkles: "Sparkles",
+  "message-square-code": "Code in a message bubble",
+  layers: "Layers",
+  "square-terminal": "Terminal (same as the Terminal plugin)",
 };
 const PROFILE_NAME = "Hover Terminal"; // marks terminals opened by this plugin
 
@@ -57,7 +69,7 @@ module.exports = class HoverTerminal extends Plugin {
       name: "Open terminal in popover",
       callback: () => this.openTerminalPopover(),
     });
-    this.addRibbonIcon("square-terminal", "Open terminal in popover (Hover Terminal)", () => this.openTerminalPopover());
+    this.ribbonEl = this.addRibbonIcon(this.settings.ribbonIcon, "Open terminal in popover (Hover Terminal)", () => this.openTerminalPopover());
 
     this.statusEl = this.addStatusBarItem();
     this.statusEl.addClass("hover-terminal-status", "mod-clickable");
@@ -88,6 +100,7 @@ module.exports = class HoverTerminal extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+    if (this.ribbonEl) setIcon(this.ribbonEl, this.settings.ribbonIcon);
     this.tick();
   }
 
@@ -350,6 +363,14 @@ class HoverTerminalSettingTab extends PluginSettingTab {
       .setDesc("Applies to terminals opened from now on. A terminal that's already open keeps its colour, because changing it would restart its shell. Some ideas: #1e1a33 deep purple, #14213d deep blue, #13261f deep green, #2a1218 deep red.")
       .addColorPicker((c) => c.setValue(s.tintColor).onChange(async (v) => { s.tintColor = v; await this.plugin.saveSettings(); }))
       .addExtraButton((b) => b.setIcon("rotate-ccw").setTooltip("Reset to default").onClick(async () => { s.tintColor = DEFAULTS.tintColor; await this.plugin.saveSettings(); this.display(); }));
+
+    new Setting(containerEl)
+      .setName("Ribbon icon")
+      .setDesc('Icon for the "Open terminal in popover" ribbon button.')
+      .addDropdown((d) => {
+        for (const [id, label] of Object.entries(RIBBON_ICONS)) d.addOption(id, label);
+        d.setValue(s.ribbonIcon).onChange(async (v) => { s.ribbonIcon = v; await this.plugin.saveSettings(); });
+      });
 
     new Setting(containerEl)
       .setName("Status bar summary")
